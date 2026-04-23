@@ -53,16 +53,37 @@ def anomali_tespit_et():
     
     ip_stats["Tehdit_Skoru"] = (ip_stats["Riskli_Istek"] / ip_stats["Toplam_Istek"]) * 100
     
+    # Zaman Bazlı Hız Analizi (Brute Force / DDoS Tespiti)
+    # Timestamp index yapılır ve 5 dakikalık pencerelerde IP bazlı gruplama yapılır.
+    df_time = df.set_index("Timestamp")
+    brute_force_stats = df_time.groupby([pd.Grouper(freq='5min'), 'IP_Address']).agg(
+        Pencere_Risk_Sayisi=("Risk_Durumu", "sum"),
+        Pencere_Toplam_Istek=("Status_Code", "count")
+    ).reset_index()
+    
     # ------------------ K: KONTROL (Control) ------------------
+    # 1. Oransal Şüpheliler (Eski Mantık)
     supheliler = ip_stats[(ip_stats["Tehdit_Skoru"] > 35) & (ip_stats["Riskli_Istek"] >= 5)]
     
+    # 2. Brute Force / DDoS Şüphelileri (Yeni Mantık)
+    # 5 dakika içinde 10'dan fazla riskli istek varsa Brute Force olarak işaretle
+    brute_force_supheliler = brute_force_stats[brute_force_stats["Pencere_Risk_Sayisi"] >= 10]
+    
     # ------------------ Ç: ÇIKTI (Output) ------------------
-    print("\n--- [!] TESPİT EDİLEN ŞÜPHELİ IP ADRESLERİ ---")
+    print("\n--- [!] TESPİT EDİLEN ŞÜPHELİ IP ADRESLERİ (Oransal) ---")
     if supheliler.empty:
         print("Sistem güvende. Anormal bir aktivite tespit edilmedi.")
     else:
         for idx, row in supheliler.sort_values(by="Tehdit_Skoru", ascending=False).iterrows():
             print(f"Uyarı! IP: {row['IP_Address']:15} | Toplam Ziyaret: {row['Toplam_Istek']:<4} | Maskelenmiş İhlaller: {row['Riskli_Istek']:<3} | Tehdit Olasılığı: %{row['Tehdit_Skoru']:.1f}")
+
+    print("\n--- [🚀] ZAMAN BAZLI ANALİZ: BRUTE FORCE TESPİTİ ---")
+    if brute_force_supheliler.empty:
+        print("Sistem güvende. Zaman bazlı kaba kuvvet veya DDoS saldırısı saptanmadı.")
+    else:
+        for idx, row in brute_force_supheliler.sort_values(by="Pencere_Risk_Sayisi", ascending=False).iterrows():
+            zaman = row['Timestamp'].strftime('%H:%M:%S')
+            print(f"KRİTİK UYARI! Saat {zaman} civarında {row['IP_Address']:15} IP'si 5 dk içinde {row['Pencere_Risk_Sayisi']:<3} riskli istek yaptı. (Olası Brute Force!)")
             
     print("\n--- EN ÇOK SALDIRI ALAN ENDPOINTLER (İlk 3) ---")
     print(df[df['Risk_Durumu'] == 1]["Endpoint"].value_counts().head(3).to_string())
@@ -74,10 +95,10 @@ def anomali_tespit_et():
     print("   Siber güvenlik uzmanının on binlerce satır içerisinde hacker'ı gözlemlemesi imkansızdır.")
     print("2. Programın Getirdiği Modüler Zeka:")
     print("   Veriler 'data_generator.py' modülünde bağımsız olarak üretilir (SoC).")
-    print("   Pandas (GroupBy) altyapısı bu verileri saniyeler içinde özetleyip skorlar.")
+    print("   Pandas zaman serisi (.resample/Grouper) ve gruplama (GroupBy) ile saniyeler içinde analiz edilir.")
     print("3. Kullanıcıya Verdiği Akıl (Tavsiye):")
-    if not supheliler.empty:
-        en_tehlikeli = supheliler.sort_values(by="Tehdit_Skoru", ascending=False).iloc[0]['IP_Address']
+    if not supheliler.empty or not brute_force_supheliler.empty:
+        en_tehlikeli = supheliler.sort_values(by="Tehdit_Skoru", ascending=False).iloc[0]['IP_Address'] if not supheliler.empty else brute_force_supheliler.iloc[0]['IP_Address']
         print(f"   Sistem, log kalabalığı arasında 'Dikkat, {en_tehlikeli} numaralı IP bir saldırgandır!' aklını verir.")
         print(f"   Tavsiye: Bu IP adres(ler)i acilen Firewall'dan Kara Liste'ye (Ban) alınmalıdır.")
     else:

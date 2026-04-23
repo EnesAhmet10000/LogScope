@@ -15,7 +15,8 @@ def guvenlik_logu_olustur(dosya_adi="server_log.csv"):
     baslangic = datetime.datetime.now()
     
     for i in range(1000):
-        zaman = baslangic - datetime.timedelta(minutes=random.randint(1, 2000))
+        # Gerçekçi ve yoğun bir saldırı testi için tüm olayları son 1 saate (60 dk) sıkıştırdık
+        zaman = baslangic - datetime.timedelta(minutes=random.randint(1, 60))
         ip = random.choice(ip_listesi)
         
         if ip == "10.0.0.99":
