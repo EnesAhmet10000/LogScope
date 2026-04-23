@@ -3,10 +3,7 @@ import datetime
 import random
 
 def guvenlik_logu_olustur(dosya_adi="server_log.csv"):
-    """ 
-    Modüler Yapı: Sadece veri üretiminden sorumlu Python Modülü (Data Access Layer).
-    DRY Kuralı: 1000 satırı tekrarlamak yerine döngü kullanıldı.
-    """
+    
     print(f"Modül: {dosya_adi} için gerçekçi siber güvenlik verileri sentezleniyor...")
     ip_listesi = [f"192.168.1.{random.randint(10, 50)}" for _ in range(15)] + ["10.0.0.99"] * 5 
     durum_kodlari = [200, 201, 400, 401, 403, 404, 500]
