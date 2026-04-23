@@ -13,9 +13,13 @@
 import pandas as pd
 import numpy as np
 import os
+import datetime
 
 # data_generator.py içerisinden veri üretim modülünü içeri aktarma
 from data_generator import guvenlik_logu_olustur
+
+# Görselleştirme modülünü içeri aktarma (SoC)
+from visualize import log_gorsellestir
 
 LOG_FILE = "server_log.csv"
 
@@ -69,41 +73,57 @@ def anomali_tespit_et():
     # 5 dakika içinde 10'dan fazla riskli istek varsa Brute Force olarak işaretle
     brute_force_supheliler = brute_force_stats[brute_force_stats["Pencere_Risk_Sayisi"] >= 10]
     
-    # ------------------ Ç: ÇIKTI (Output) ------------------
-    print("\n--- [!] TESPİT EDİLEN ŞÜPHELİ IP ADRESLERİ (Oransal) ---")
-    if supheliler.empty:
-        print("Sistem güvende. Anormal bir aktivite tespit edilmedi.")
-    else:
-        for idx, row in supheliler.sort_values(by="Tehdit_Skoru", ascending=False).iterrows():
-            print(f"Uyarı! IP: {row['IP_Address']:15} | Toplam Ziyaret: {row['Toplam_Istek']:<4} | Maskelenmiş İhlaller: {row['Riskli_Istek']:<3} | Tehdit Olasılığı: %{row['Tehdit_Skoru']:.1f}")
-
-    print("\n--- [🚀] ZAMAN BAZLI ANALİZ: BRUTE FORCE TESPİTİ ---")
-    if brute_force_supheliler.empty:
-        print("Sistem güvende. Zaman bazlı kaba kuvvet veya DDoS saldırısı saptanmadı.")
-    else:
-        for idx, row in brute_force_supheliler.sort_values(by="Pencere_Risk_Sayisi", ascending=False).iterrows():
-            zaman = row['Timestamp'].strftime('%H:%M:%S')
-            print(f"KRİTİK UYARI! Saat {zaman} civarında {row['IP_Address']:15} IP'si 5 dk içinde {row['Pencere_Risk_Sayisi']:<3} riskli istek yaptı. (Olası Brute Force!)")
-            
-    print("\n--- EN ÇOK SALDIRI ALAN ENDPOINTLER (İlk 3) ---")
-    print(df[df['Risk_Durumu'] == 1]["Endpoint"].value_counts().head(3).to_string())
+    # ------------------ Ç: ÇIKTI (Output) ve DOSYALAMA (File I/O) ------------------
+    zaman_damgasi = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    rapor_dosyasi = f"tehdit_raporu_{zaman_damgasi}.txt"
     
-    print("\n====================================================")
-    print(" 🎯 SİSTEMİN VERDİĞİ AKIL VE ÇÖZDÜĞÜ GERÇEK SORUN")
-    print("====================================================")
-    print("1. Gerçek Hayat Sorunu:")
-    print("   Siber güvenlik uzmanının on binlerce satır içerisinde hacker'ı gözlemlemesi imkansızdır.")
-    print("2. Programın Getirdiği Modüler Zeka:")
-    print("   Veriler 'data_generator.py' modülünde bağımsız olarak üretilir (SoC).")
-    print("   Pandas zaman serisi (.resample/Grouper) ve gruplama (GroupBy) ile saniyeler içinde analiz edilir.")
-    print("3. Kullanıcıya Verdiği Akıl (Tavsiye):")
-    if not supheliler.empty or not brute_force_supheliler.empty:
-        en_tehlikeli = supheliler.sort_values(by="Tehdit_Skoru", ascending=False).iloc[0]['IP_Address'] if not supheliler.empty else brute_force_supheliler.iloc[0]['IP_Address']
-        print(f"   Sistem, log kalabalığı arasında 'Dikkat, {en_tehlikeli} numaralı IP bir saldırgandır!' aklını verir.")
-        print(f"   Tavsiye: Bu IP adres(ler)i acilen Firewall'dan Kara Liste'ye (Ban) alınmalıdır.")
-    else:
-         print("   Sistem bir tehdit bulamadığı için operasyonel rahattır.")
-    print("====================================================\n")
+    with open(rapor_dosyasi, "w", encoding="utf-8") as f:
+        # Hem konsola yazdıran hem de dosyaya kaydeden yardımcı fonksiyon
+        def log_ve_yaz(mesaj):
+            print(mesaj)
+            f.write(mesaj + "\n")
+            
+        log_ve_yaz("\n--- [!] TESPİT EDİLEN ŞÜPHELİ IP ADRESLERİ (Oransal) ---")
+        if supheliler.empty:
+            log_ve_yaz("Sistem güvende. Anormal bir aktivite tespit edilmedi.")
+        else:
+            for idx, row in supheliler.sort_values(by="Tehdit_Skoru", ascending=False).iterrows():
+                log_ve_yaz(f"Uyarı! IP: {row['IP_Address']:15} | Toplam Ziyaret: {row['Toplam_Istek']:<4} | Maskelenmiş İhlaller: {row['Riskli_Istek']:<3} | Tehdit Olasılığı: %{row['Tehdit_Skoru']:.1f}")
+
+        log_ve_yaz("\n--- [🚀] ZAMAN BAZLI ANALİZ: BRUTE FORCE TESPİTİ ---")
+        if brute_force_supheliler.empty:
+            log_ve_yaz("Sistem güvende. Zaman bazlı kaba kuvvet veya DDoS saldırısı saptanmadı.")
+        else:
+            for idx, row in brute_force_supheliler.sort_values(by="Pencere_Risk_Sayisi", ascending=False).iterrows():
+                zaman = row['Timestamp'].strftime('%H:%M:%S')
+                log_ve_yaz(f"KRİTİK UYARI! Saat {zaman} civarında {row['IP_Address']:15} IP'si 5 dk içinde {row['Pencere_Risk_Sayisi']:<3} riskli istek yaptı. (Olası Brute Force!)")
+                
+        log_ve_yaz("\n--- EN ÇOK SALDIRI ALAN ENDPOINTLER (İlk 3) ---")
+        log_ve_yaz(df[df['Risk_Durumu'] == 1]["Endpoint"].value_counts().head(3).to_string())
+        
+        log_ve_yaz("\n====================================================")
+        log_ve_yaz(" 🎯 SİSTEMİN VERDİĞİ AKIL VE ÇÖZDÜĞÜ GERÇEK SORUN")
+        log_ve_yaz("====================================================")
+        log_ve_yaz("1. Gerçek Hayat Sorunu:")
+        log_ve_yaz("   Siber güvenlik uzmanının on binlerce satır içerisinde hacker'ı gözlemlemesi imkansızdır.")
+        log_ve_yaz("2. Programın Getirdiği Modüler Zeka:")
+        log_ve_yaz("   Veriler 'data_generator.py' modülünde bağımsız olarak üretilir (SoC).")
+        log_ve_yaz("   Pandas zaman serisi (.resample/Grouper) ve gruplama (GroupBy) ile saniyeler içinde analiz edilir.")
+        log_ve_yaz("   Sonuçlar 'visualize.py' modülü üzerinden Matplotlib ve Seaborn ile görselleştirilir.")
+        log_ve_yaz("   G-İ-K-Ç yapısına uygun olarak rapor otomatik kaydedilir (File I/O).")
+        log_ve_yaz("3. Kullanıcıya Verdiği Akıl (Tavsiye):")
+        if not supheliler.empty or not brute_force_supheliler.empty:
+            en_tehlikeli = supheliler.sort_values(by="Tehdit_Skoru", ascending=False).iloc[0]['IP_Address'] if not supheliler.empty else brute_force_supheliler.iloc[0]['IP_Address']
+            log_ve_yaz(f"   Sistem, log kalabalığı arasında 'Dikkat, {en_tehlikeli} numaralı IP bir saldırgandır!' aklını verir.")
+            log_ve_yaz(f"   Tavsiye: Bu IP adres(ler)i acilen Firewall'dan Kara Liste'ye (Ban) alınmalıdır.")
+        else:
+             log_ve_yaz("   Sistem bir tehdit bulamadığı için operasyonel rahattır.")
+        log_ve_yaz("====================================================\n")
+        
+    print(f"\n[BİLGİ] Yukarıdaki analiz raporu '{rapor_dosyasi}' dosyasına kalıcı olarak kaydedildi.")
+    
+    # Tüm analiz bittikten sonra rapor grafiklerini ekrana çizdir (Çıktı aşaması)
+    log_gorsellestir(df, ip_stats)
 
 if __name__ == "__main__":
     print("\n>>> BPU Dersi Kuralları (Multi-File SoC, DRY, G-İ-K-Ç) Aktif Edildi... <<<\n")
